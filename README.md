@@ -1,6 +1,6 @@
-# NOTEARS-Tensorflow
+# NOTEARS-Tensorflow2
 
-This repository is a Tensorflow reimplementation of NOTEARS [1].
+This repository is a Tensorflow2 reimplementation of NOTEARS [1].
 
 ## 1. Setup
 
