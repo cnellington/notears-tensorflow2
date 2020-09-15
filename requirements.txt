@@ -1,6 +1,5 @@
-numpy
+tensorflow==2.0
 networkx
 pyyaml
 pytz
 matplotlib
-tensorflow==1.15.2
