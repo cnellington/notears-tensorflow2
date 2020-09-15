@@ -55,14 +55,18 @@ class NoTears(object):
     def loss(self):
         mse_loss = self._get_mse_loss()
         h = self.h()
-        loss_val = 0.5 / self.n * mse_loss \
+        return 0.5 / self.n * mse_loss \
             + self.l1_lambda * tf.norm(tensor=self.W_prime, ord=1) \
             + self.alpha * h + 0.5 * self.rho * h * h
-        return loss_val
 
     @tf.function
     def h(self):  # Acyclicity
         return tf.linalg.trace(tf.linalg.expm(self.W_prime * self.W_prime)) - self.d
+
+    @tf.function
+    def _get_mse_loss(self):
+        X_prime = tf.matmul(self.X, self.W_prime)
+        return tf.square(tf.linalg.norm(tensor=self.X - X_prime))
 
     def train(self, X, W_true, l1_lambda=0, learning_rate=1e-3,
               graph_thres=0.3, h_thres=0.25, h_tol=1e-8,
@@ -72,30 +76,30 @@ class NoTears(object):
         self.n = self.X.shape[0]
         self.d = self.X.shape[1]
         self.l1_lambda = l1_lambda
-        self.rho = init_rho
-        self.alpha = 0.0
+        self.rho = tf.Variable(init_rho, dtype=self.tf_float_type)
+        self.alpha = tf.Variable(0.0, dtype=self.tf_float_type)
 
         W = tf.zeros([self.d, self.d], self.tf_float_type)
         self.W_prime = tf.Variable(self._preprocess_graph(W), dtype=self.tf_float_type, trainable=True)
         train_opt = tf.keras.optimizers.Adam(learning_rate=learning_rate)
-        # pdb.set_trace()
 
         self._logger.info('Started training for {} iterations'.format(max_iter))
+        h = np.inf
         for epoch in range(1, max_iter + 1):
-            while self.rho < rho_thres:
-                self._logger.info('rho {:.3E}, alpha {:.3E}'.format(self.rho, self.alpha))
-                h_prev = self.h().numpy()
+            while self.rho.numpy() < rho_thres:
+                self._logger.info('rho {:.3E}, alpha {:.3E}'.format(self.rho.numpy(), self.alpha.numpy()))
                 self.train_step(train_opt, iter_step)
-                print(f"W_prime[0][0]: {self.W_prime[0][0]}")
-                if self.h().numpy() > h_thres * h_prev:
-                    self.rho *= rho_multiply
+                h_new = self.h().numpy()
+                if h_new > h_thres * h:
+                    self.rho.assign(self.rho.numpy() * rho_multiply)
                 else:
                     break
 
             self.train_callback(epoch, W_true, graph_thres)
-            self.alpha = self.rho * self.h()
+            h = self.h()
+            self.alpha.assign(self.rho.numpy() * h)
 
-            if self.h() < h_tol and epoch > init_iter:
+            if h < h_tol and epoch > init_iter:
                 self._logger.info('Early stopping at {}-th iteration'.format(epoch))
                 break
 
@@ -103,11 +107,12 @@ class NoTears(object):
 
     def train_step(self, train_opt, iter_step):
         for _ in range(iter_step):
-            with tf.GradientTape() as tape:
-                loss = self.loss()
-            vars = [self.W_prime]
-            grads = tape.gradient(loss, vars)
-            train_opt.apply_gradients(zip(grads, vars))
+            train_opt.minimize(self.loss, [self.W_prime])
+            # with tf.GradientTape() as tape:
+            #     loss = self.loss()
+            # vars = [self.W_prime]
+            # grads = tape.gradient(loss, vars)
+            # train_opt.apply_gradients(zip(grads, vars))
 
     def train_callback(self, epoch, W_true, graph_thres):
         # Evaluate the learned W in each iteration after thresholding
@@ -129,11 +134,6 @@ class NoTears(object):
     def _preprocess_graph(self, W):
         # Mask the diagonal entries of graph
         return tf.linalg.set_diag(W, tf.zeros(W.shape[0], dtype=self.tf_float_type))
-
-    @tf.function
-    def _get_mse_loss(self):
-        X_prime = tf.matmul(self.X, self.W_prime)
-        return tf.square(tf.linalg.norm(tensor=self.X - X_prime))
 
     # def _init_session(self):
     #     if self.use_gpu:
