@@ -97,7 +97,7 @@ class NoTears(object):
 
             self.train_callback(epoch, W_true, graph_thres)
             h = self.h()
-            self.alpha.assign(self.rho.numpy() * h)
+            self.alpha.assign(self.alpha + self.rho.numpy() * h)
 
             if h < h_tol and epoch > init_iter:
                 self._logger.info('Early stopping at {}-th iteration'.format(epoch))
