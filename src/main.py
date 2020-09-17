@@ -6,7 +6,6 @@ import numpy as np
 
 from data_loader import SyntheticDataset
 from models import NoTears
-from trainers import ALTrainer
 from helpers.config_utils import save_yaml_config, get_args
 from helpers.log_helper import LogHelper
 from helpers.tf_utils import set_seed
@@ -40,18 +39,12 @@ def main():
     _logger.info('Finished generating dataset')
 
     model = NoTears(args.use_gpu, args.seed, args.use_float64)
-    model.print_summary(print_func=model.logger.info)
-
-    W_est = model.train(dataset.X, dataset.W,
+    W_est = model.train(dataset.X, dataset.W, output_dir,
                         l1_lambda=args.l1_lambda, learning_rate=args.learning_rate,
                         graph_thres=args.graph_thres, h_thres=args.h_thres, h_tol=args.h_tol,
                         init_rho=args.init_rho, rho_multiply=args.rho_multiply,
                         rho_thres=args.rho_thres, init_iter=args.init_iter,
                         iter_step=args.iter_step, max_iter=args.max_iter)
-    # trainer = ALTrainer(args.init_rho, args.rho_thres, args.h_thres, args.rho_multiply,
-    #                     args.init_iter, args.learning_rate, args.h_tol)
-    # W_est = trainer.train(model, dataset.X, dataset.W, args.graph_thres,
-    #                       args.max_iter, args.iter_step, output_dir)
     _logger.info('Finished training model')
 
     # Save raw estimated graph, ground truth and observational data after training
